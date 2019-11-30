@@ -1,5 +1,6 @@
-//! Determines whether a given HTTP response can be cached and whether a cached response can be
-//! reused, following the rules specified in [RFC 7234](https://httpwg.org/specs/rfc7234.html).
+//! Determines whether a given HTTP response can be cached and whether a
+//! cached response can be reused, following the rules specified in [RFC
+//! 7234](https://httpwg.org/specs/rfc7234.html).
 
 #![warn(missing_docs)]
 // TODO: turn these warnings back on once everything is implemented
@@ -76,38 +77,42 @@ lazy_static! {
     };
 }
 
-/// Holds configuration options which control the behavior of the cache and are independent of
-/// any specific request or response.
+/// Holds configuration options which control the behavior of the cache and
+/// are independent of any specific request or response.
 #[derive(Debug, Clone)]
 pub struct CacheOptions {
-    /// If `shared` is `true` (default), then the response is evaluated from a perspective of a
-    /// shared cache (i.e. `private` is not cacheable and `s-maxage` is respected). If `shared`
-    /// is `false`, then the response is evaluated from a perspective of a single-user cache
-    /// (i.e. `private` is cacheable and `s-maxage` is ignored). `shared: true` is recommended
+    /// If `shared` is `true` (default), then the response is evaluated from a
+    /// perspective of a shared cache (i.e. `private` is not cacheable and
+    /// `s-maxage` is respected). If `shared` is `false`, then the response is
+    /// evaluated from a perspective of a single-user cache (i.e. `private` is
+    /// cacheable and `s-maxage` is ignored). `shared: true` is recommended
     /// for HTTP clients.
     pub shared: bool,
 
-    /// If `ignore_cargo_cult` is `true`, common anti-cache directives will be completely
-    /// ignored if the non-standard `pre-check` and `post-check` directives are present. These
-    /// two useless directives are most commonly found in bad StackOverflow answers and PHP's
-    /// "session limiter" defaults.
+    /// If `ignore_cargo_cult` is `true`, common anti-cache directives will be
+    /// completely ignored if the non-standard `pre-check` and `post-check`
+    /// directives are present. These two useless directives are most commonly
+    /// found in bad StackOverflow answers and PHP's "session limiter"
+    /// defaults.
     pub ignore_cargo_cult: bool,
 
-    /// If `trust_server_date` is `false`, then server's `Date` header won't be used as the
-    /// base for `max-age`. This is against the RFC, but it's useful if you want to cache
-    /// responses with very short `max-age`, but your local clock is not exactly in sync with
-    /// the server's.
+    /// If `trust_server_date` is `false`, then server's `Date` header won't
+    /// be used as the base for `max-age`. This is against the RFC, but it's
+    /// useful if you want to cache responses with very short `max-age`, but
+    /// your local clock is not exactly in sync with the server's.
     pub trust_server_date: bool,
 
-    /// `cache_heuristic` is a fraction of response's age that is used as a fallback
-    /// cache duration. The default is 0.1 (10%), e.g. if a file hasn't been modified for 100
-    /// days, it'll be cached for 100*0.1 = 10 days.
+    /// `cache_heuristic` is a fraction of response's age that is used as a
+    /// fallback cache duration. The default is 0.1 (10%), e.g. if a file
+    /// hasn't been modified for 100 days, it'll be cached for 100*0.1 = 10
+    /// days.
     pub cache_heuristic: f32,
 
-    /// `immutable_min_time_to_live` is a number of seconds to assume as the default time to
-    /// cache responses with `Cache-Control: immutable`. Note that per RFC these can become
-    /// stale, so `max-age` still overrides the default.
-    pub immutable_min_time_to_live: u32,
+    /// `immutable_min_time_to_live` is a number of seconds to assume as the
+    /// default time to cache responses with `Cache-Control: immutable`. Note
+    /// that per RFC these can become stale, so `max-age` still overrides the
+    /// default.
+    pub immutable_min_ttl: u32,
 
     // Allow more fields to be added later without breaking callers.
     _hidden: (),
@@ -120,51 +125,58 @@ impl Default for CacheOptions {
             ignore_cargo_cult: false,
             trust_server_date: true,
             cache_heuristic: 0.1, // 10% matches IE
-            immutable_min_time_to_live: 86400,
+            immutable_min_ttl: 86400,
             _hidden: (),
         }
     }
 }
 
-/// Identifies when responses can be reused from a cache, taking into account HTTP RFC 7234 rules
-/// for user agents and shared caches. It's aware of many tricky details such as the Vary header,
-/// proxy revalidation, and authenticated responses.
+/// Identifies when responses can be reused from a cache, taking into account
+/// HTTP RFC 7234 rules for user agents and shared caches. It's aware of many
+/// tricky details such as the Vary header, proxy revalidation, and
+/// authenticated responses.
 #[derive(Debug)]
-pub struct CachePolicy;
+pub struct CachePolicy {
+    opts: CacheOptions,
+}
 
 impl CacheOptions {
-    /// Cacheability of an HTTP response depends on how it was requested, so both request and
-    /// response are required to create the policy.
-    pub fn policy_for(&self, request: &Request, response: &Response) -> CachePolicy {
-        CachePolicy
+    /// Cacheability of an HTTP response depends on how it was requested, so
+    /// both request and response are required to create the policy.
+    pub fn policy_for(self, request: &Request, response: &Response) -> CachePolicy {
+        CachePolicy { opts: self }
     }
 }
 
 impl CachePolicy {
-    /// Returns `true` if the response can be stored in a cache. If it's `false` then you MUST NOT
-    /// store either the request or the response.
+    /// Returns `true` if the response can be stored in a cache. If it's
+    /// `false` then you MUST NOT store either the request or the response.
     pub fn is_storable(&self) -> bool {
         unimplemented!();
     }
 
-    /// Returns approximate time in _milliseconds_ until the response becomes stale (i.e. not
-    /// fresh).
+    /// Returns approximate time in _milliseconds_ until the response becomes
+    /// stale (i.e. not fresh).
     ///
-    /// After that time (when `time_to_live() <= 0`) the response might not be usable without
-    /// revalidation. However, there are exceptions, e.g. a client can explicitly allow stale
-    /// responses, so always check with `is_cached_response_fresh()`.
+    /// After that time (when `time_to_live() <= 0`) the response might not be
+    /// usable without revalidation. However, there are exceptions, e.g. a
+    /// client can explicitly allow stale responses, so always check with
+    /// `is_cached_response_fresh()`.
     pub fn time_to_live(&self) -> u32 {
         unimplemented!();
     }
 
-    /// Returns whether the cached response is still fresh in the context of the new request.
+    /// Returns whether the cached response is still fresh in the context of
+    /// the new request.
     ///
-    /// If it returns `true`, then the given request matches the original response this cache
-    /// policy has been created with, and the response can be reused without contacting the server.
+    /// If it returns `true`, then the given request matches the original
+    /// response this cache policy has been created with, and the response can
+    /// be reused without contacting the server.
     ///
-    /// If it returns `false`, then the response may not be matching at all (e.g. it's for a
-    /// different URL or method), or may require to be refreshed first. Either way, the new
-    /// request's headers will have been updated for sending it to the origin server.
+    /// If it returns `false`, then the response may not be matching at all
+    /// (e.g. it's for a different URL or method), or may require to be
+    /// refreshed first. Either way, the new request's headers will have been
+    /// updated for sending it to the origin server.
     pub fn is_cached_response_fresh(
         &self,
         new_request: &mut Request,
@@ -173,14 +185,16 @@ impl CachePolicy {
         unimplemented!();
     }
 
-    /// Use this method to update the policy state after receiving a new response from the origin
-    /// server. The updated `CachePolicy` should be saved to the cache along with the new response.
+    /// Use this method to update the policy state after receiving a new
+    /// response from the origin server. The updated `CachePolicy` should be
+    /// saved to the cache along with the new response.
     ///
-    /// Returns whether the cached response body is still valid. If `true`, then a valid 304 Not
-    /// Modified response has been received, and you can reuse the old cached response body. If
-    /// `false`, you should use new response's body (if present), or make another request to the
-    /// origin server without any conditional headers (i.e. don't use `is_cached_response_fresh`
-    /// this time) to get the new resource.
+    /// Returns whether the cached response body is still valid. If `true`,
+    /// then a valid 304 Not Modified response has been received, and you can
+    /// reuse the old cached response body. If `false`, you should use new
+    /// response's body (if present), or make another request to the origin
+    /// server without any conditional headers (i.e. don't use
+    /// `is_cached_response_fresh` this time) to get the new resource.
     pub fn is_cached_response_valid(
         &mut self,
         new_request: &Request,
@@ -190,9 +204,10 @@ impl CachePolicy {
         unimplemented!();
     }
 
-    /// Updates and filters the response headers for a cached response before returning it to a
-    /// client. This function is necessary, because proxies MUST always remove hop-by-hop headers
-    /// (such as TE and Connection) and update response's Age to avoid doubling cache time.
+    /// Updates and filters the response headers for a cached response before
+    /// returning it to a client. This function is necessary, because proxies
+    /// MUST always remove hop-by-hop headers (such as TE and Connection) and
+    /// update response's Age to avoid doubling cache time.
     pub fn update_response_headers(&self, headers: &mut Response) {
         unimplemented!();
     }
