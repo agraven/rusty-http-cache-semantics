@@ -141,6 +141,10 @@ pub struct CachePolicy {
 }
 
 impl CacheOptions {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
     /// Cacheability of an HTTP response depends on how it was requested, so
     /// both request and response are required to create the policy.
     pub fn policy_for(self, request: &Request, response: &Response) -> CachePolicy {
@@ -149,6 +153,10 @@ impl CacheOptions {
 }
 
 impl CachePolicy {
+    pub fn new(request: &Request, response: &Response) -> Self {
+        CacheOptions::new().policy_for(request, response)
+    }
+
     /// Returns `true` if the response can be stored in a cache. If it's
     /// `false` then you MUST NOT store either the request or the response.
     pub fn is_storable(&self) -> bool {
@@ -219,8 +227,6 @@ mod tests {
     use chrono::prelude::*;
     use serde_json::{json, Value};
     use std::collections::HashMap;
-    use std::collections::HashSet;
-    use std::string::String;
 
     fn assert_cached(should_put: bool, response_code: i32) {
         let expected_response_code = response_code;
